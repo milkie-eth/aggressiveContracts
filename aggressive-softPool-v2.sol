@@ -64,11 +64,12 @@ contract pool {
         require(staker.amount > 0, "No tokens staked");
         require(block.timestamp >= staker.time + 0.25 hours, "You need to stake your tokens for a minimum of 15 minutes, try again soon.");
 
-        uint256 elapsedTime = (block.timestamp - staker.time) / 900; // Calculate elapsed time
-        uint256 reward = staker.amount + (staker.amount * elapsedTime * rewardPercentage) / 1000;
+        uint256 elapsedTime = (block.timestamp - staker.time); // Calculate elapsed time
+        uint256 reward = staker.amount + (staker.amount * elapsedTime * rewardPercentage) / (1000 * 900);
 
 
-        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / 1000;
+
+        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 900);
         additionalModifier = additionalModifier % 101; // Ensure the value is between 0 and 100
         rewardChance + additionalModifier;
 
@@ -131,8 +132,8 @@ contract pool {
         Staker memory staker = stakers[_staker];
         require(staker.amount > 0, "No tokens staked");
 
-        uint256 elapsedTime = (block.timestamp - staker.time) / 900; // Calculate elapsed time in hours
-        uint256 reward = staker.amount + (staker.amount * elapsedTime * rewardPercentage) / 1000;
+        uint256 elapsedTime = (block.timestamp - staker.time); // Calculate elapsed time in hours
+        uint256 reward = staker.amount + (staker.amount * elapsedTime * rewardPercentage) / (1000 * 900);
         return reward;
     }
 
@@ -140,8 +141,8 @@ contract pool {
         Staker memory staker = stakers[_staker];
         require(staker.amount > 0, "No tokens staked");
 
-        uint256 elapsedTime = (block.timestamp - staker.time) / 900; // Calculate elapsed time in hours
-        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / 1000;
+        uint256 elapsedTime = (block.timestamp - staker.time); // Calculate elapsed time in hours
+        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 900);
         additionalModifier = additionalModifier % 101; // Ensure the value is between 0 and 100
         uint256 currentChance = rewardChance + additionalModifier;
         return currentChance;
