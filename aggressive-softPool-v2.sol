@@ -93,11 +93,10 @@ contract pool {
 
             // Transfer 10% of reward balance to burn address and the rest to the staker
             uint256 splitAmount = reward / 10;
-            uint256 burnAmount = splitAmount / 2;
             uint256 stakerAmount = reward - splitAmount;
             
             if (splitAmount > 0) {
-                IERC20(tokenAddress).transfer(burnAddress, burnAmount);
+                IERC20(tokenAddress).transfer(burnAddress, splitAmount);
             }
             if (stakerAmount > 0) {
                 IERC20(tokenAddress).transfer(msg.sender, stakerAmount);
