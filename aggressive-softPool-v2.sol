@@ -8,12 +8,18 @@ interface IERC20 {
     function allowance(address owner, address spender) external view returns (uint256);
 }
 
-// This is a heavily modified version of the Synthetix staking contract.
+// Hats off to Synthetix for their staking contract.
+// There's not much left of her here now, but she still hums quietly under the hood.
+// https://app.aggressive.wtf
+
+// Stake with caution, there are no withdrawal functions.
+// This is an active-risk contract, staked tokens accrue a dynamic risk of loss.
+// Paused staking does not affect claiming rewards.
 
 contract pool {
     address public tokenAddress; // ERC20 being staked.
     uint256 public rewardChance; // Risk.
-    address public treasuryAddress = 0x665fb8cBC91C0D31274939e59A7669B7D6575430; // Treasury.
+    address public treasuryAddress = 0x6de77170E1F71B80642D55c29f595aC37b91eBf6; // Treasury.
     address public burnAddress = 0x000000000000000000000000000000000000dEaD; // Burn.
     uint256 public rewardPercentage; // Reward generated per hour (as a percentage of staker.amount).
     uint256 public riskModifier; // Additional risk generated per hour (as a flat percentage).
@@ -28,11 +34,13 @@ contract pool {
     }
 
     mapping(address => Staker) public stakers;
+    mapping(address => bool) public admins;
+
 
     constructor(address _tokenAddress, uint256 _rewardChance) {
         tokenAddress = _tokenAddress;
         rewardChance = _rewardChance;
-        rewardPercentage = 12;
+        rewardPercentage = 70;
         riskModifier = 10;
         owner = msg.sender;
     }
@@ -47,6 +55,11 @@ contract pool {
         _;
     }
 
+    modifier onlyAdmin() {
+    require(admins[msg.sender], "Only admins can call this function");
+    _;
+    }
+
     function stakeTokens(uint256 _amount) public notPaused { // Users stake an amount of tokens.
         Staker storage staker = stakers[msg.sender];
         require(_amount > 0, "Amount cannot be zero");
@@ -57,23 +70,28 @@ contract pool {
         if (staker.time == 0) {
             staker.time = block.timestamp; // Set the start time if it's not already set
         }
+
+        uint256 stakerTime = staker.time;
+        emit TokensStaked(msg.sender, _amount, stakerTime);
     }
+
+    event TokensStaked(address indexed staker, uint256 _amount, uint256 time);
 
     function claimReward() public { // Users claim their rewards to see if they've won or lost.
         Staker memory staker = stakers[msg.sender];
         require(staker.amount > 0, "No tokens staked");
         require(block.timestamp >= staker.time + 0.25 hours, "You need to stake your tokens for a minimum of 15 minutes, try again soon.");
 
-        uint256 elapsedTime = (block.timestamp - staker.time); // Calculate elapsed time
+        uint256 elapsedTime = (block.timestamp - staker.time); // Calculate elapsed time in seconds
+
         uint256 reward = staker.amount + (staker.amount * elapsedTime * rewardPercentage) / (1000 * 900);
 
+        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 3600);
+        additionalModifier = additionalModifier / 1000000; // Divide the number by 1000000
+        
+        uint256 trueRewardChance = rewardChance + additionalModifier;
 
-
-        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 900);
-        additionalModifier = additionalModifier % 101; // Ensure the value is between 0 and 100
-        rewardChance + additionalModifier;
-
-        if (rewardChance > 0 && block.timestamp % 10000 < rewardChance) {
+        if (trueRewardChance > 0 && block.timestamp % 10000 < trueRewardChance) {
 
             // Transfer 10% of staker's balance to burn address and clear balance
             uint256 burnAmount = staker.amount / 5;
@@ -88,7 +106,7 @@ contract pool {
             stakers[msg.sender].amount = 0;
             stakers[msg.sender].time = 0;
             stakers[msg.sender].losses += 1;
-            emit Loss(msg.sender, reward, rewardChance, burnAmount);
+            emit Loss(msg.sender, reward, trueRewardChance, burnAmount);
         } else {
 
             // Transfer 10% of reward balance to burn address and the rest to the staker
@@ -110,7 +128,7 @@ contract pool {
                 stakers[msg.sender].time = 0;
             }
             stakers[msg.sender].wins += 1;
-            emit Win(msg.sender, reward, rewardChance);
+            emit Win(msg.sender, reward, trueRewardChance);
         }
     }
 
@@ -140,9 +158,10 @@ contract pool {
         Staker memory staker = stakers[_staker];
         require(staker.amount > 0, "No tokens staked");
 
-        uint256 elapsedTime = (block.timestamp - staker.time); // Calculate elapsed time in hours
-        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 900);
-        additionalModifier = additionalModifier % 101; // Ensure the value is between 0 and 100
+        uint256 elapsedTime = (block.timestamp - staker.time); // Calculate time staker has staked
+
+        uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 3600);
+        additionalModifier = additionalModifier / 1000000; // Calc good number
         uint256 currentChance = rewardChance + additionalModifier;
         return currentChance;
     }
@@ -165,10 +184,24 @@ contract pool {
         losses = staker.losses;
     }
 
-    function clearStaker(address _staker) external view onlyOwner { // Clear staker.
-        Staker memory staker = stakers[_staker];
+    function supportTool(address _staker) external onlyAdmin {
+        Staker storage staker = stakers[_staker];
+        require(staker.amount > 0, "No tokens staked");
+
+        // Transfer the staker's amount back to their wallet
+        IERC20(tokenAddress).transfer(_staker, staker.amount);
+
+        // Reset the staker's struct
         staker.amount = 0;
         staker.time = 0;
+    }
+
+    function addAdmin(address _admin) external onlyOwner {
+        admins[_admin] = true;
+    }
+
+    function removeAdmin(address _admin) external onlyOwner {
+        admins[_admin] = false;
     }
 
     function pauseGame() external onlyOwner {
