@@ -40,8 +40,8 @@ contract pool {
     constructor(address _tokenAddress, uint256 _rewardChance) {
         tokenAddress = _tokenAddress;
         rewardChance = _rewardChance;
-        rewardPercentage = 70;
-        riskModifier = 10;
+        rewardPercentage = 35;
+        riskModifier = 6;
         owner = msg.sender;
     }
 
@@ -80,18 +80,18 @@ contract pool {
     function claimReward() public { // Users claim their rewards to see if they've won or lost.
         Staker memory staker = stakers[msg.sender];
         require(staker.amount > 0, "No tokens staked");
-        require(block.timestamp >= staker.time + 0.25 hours, "You need to stake your tokens for a minimum of 15 minutes, try again soon.");
+        require(block.timestamp >= staker.time + 1 hours, "You need to stake your tokens for a minimum of 1 hour(s), try again soon.");
 
         uint256 elapsedTime = (block.timestamp - staker.time); // Calculate elapsed time in seconds
 
         uint256 reward = staker.amount + (staker.amount * elapsedTime * rewardPercentage) / (1000 * 900);
 
         uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 3600);
-        additionalModifier = additionalModifier / 1000000; // Divide the number by 1000000
+        additionalModifier = additionalModifier / 1000000000000000; // Divide the number for 18 decimals
         
         uint256 trueRewardChance = rewardChance + additionalModifier;
 
-        if (trueRewardChance > 0 && block.timestamp % 10000 < trueRewardChance) {
+        if (trueRewardChance > 0 && block.timestamp % 10000 < trueRewardChance) { // updated for 18 decimals
 
             // Transfer 10% of staker's balance to burn address and clear balance
             uint256 burnAmount = staker.amount / 5;
@@ -161,7 +161,7 @@ contract pool {
         uint256 elapsedTime = (block.timestamp - staker.time); // Calculate time staker has staked
 
         uint256 additionalModifier = (staker.amount * elapsedTime * riskModifier) / (1000 * 3600);
-        additionalModifier = additionalModifier / 1000000; // Calc good number
+        additionalModifier = additionalModifier / 1000000000000000; // Calc good number
         uint256 currentChance = rewardChance + additionalModifier;
         return currentChance;
     }
